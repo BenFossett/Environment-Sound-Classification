@@ -3,6 +3,8 @@ import time
 from multiprocessing import cpu_count
 from typing import Union, NamedTuple
 
+from dataset import UrbanSound8KDataset
+
 import torch
 import torch.backends.cudnn
 import numpy as np
@@ -64,6 +66,12 @@ parser.add_argument(
     type=int,
     help="Number of worker processes used to load data.",
 )
+parser.add_argument(
+    "--mode",
+    default="LMC",
+    type=string,
+    help="LMC, MC, or MLMC"
+)
 
 class ImageShape(NamedTuple):
     height: int
@@ -78,10 +86,15 @@ else:
 def main(args):
     transform = transforms.ToTensor()
     args.dataset_root.mkdir(parents=True, exist_ok=True)
-    train_dataset = None
-    test_dataset = None
-    train_loader = None
-    test_loader = None
+
+    train_loader = torch.utils.data.DataLoader(
+        UrbanSound8KDataset('UrbanSound8K_train.pkl', mode=args.mode),
+        batch_size=32, shuffle=True,
+        num_workers=8, pin_memory=True)
+    test_loader = torch.utils.data.DataLoader(
+        UrbanSound8KDataset('UrbanSound8K_test.pkl', mode=args.mode),
+        batch_size=32, shuffle=False,
+        num_workers=8, pin_memory=True)
 
     model = CNN(height=32, width=32, channels=3, class_count=10)
 
@@ -218,41 +231,8 @@ class Trainer:
         start_epoch: int = 0
     ):
         self.model.train()
-        for epoch in range(start_epoch, epochs):
-            self.model.train()
-            data_load_start_time = time.time()
-            for batch, labels in self.train_loader:
-                batch = batch.to(self.device)
-                labels = labels.to(self.device)
-                data_load_end_time = time.time()
-
-                logits = self.model.forward(batch)
-
-                loss = self.criterion(logits, labels)
-
-                loss.backward()
-
-                self.optimizer.step()
-                self.optimizer.zero_grad()
-
-                with torch.no_grad():
-                    preds = logits.argmax(-1)
-                    accuracy = compute_accuracy(labels, preds)
-
-                data_load_time = data_load_end_time - data_load_start_time
-                step_time = time.time() - data_load_end_time
-                if ((self.step + 1) % log_frequency) == 0:
-                    self.log_metrics(epoch, accuracy, loss, data_load_time, step_time)
-                if ((self.step + 1) % print_frequency) == 0:
-                    self.print_metrics(epoch, accuracy, loss, data_load_time, step_time)
-
-                self.step += 1
-                data_load_start_time = time.time()
-
-            self.summary_writer.add_scalar("epoch", epoch, self.step)
-            if ((epoch + 1) % val_frequency) == 0:
-                self.validate()
-                self.model.train()
+        for i, (inputs, target, filename) in enumerate(train_loader):
+            pass
 
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         epoch_step = self.step % len(self.train_loader)
@@ -291,32 +271,8 @@ class Trainer:
         self.model.eval()
 
         with torch.no_grad():
-            for batch, labels in self.val_loader:
-                batch = batch.to(self.device)
-                labels = labels.to(self.device)
-                logits = self.model(batch)
-                loss = self.criterion(logits, labels)
-                total_loss += loss.item()
-                preds = logits.argmax(dim=-1).cpu().numpy()
-                results["preds"].extend(list(preds))
-                results["labels"].extend(list(labels.cpu().numpy()))
-
-        accuracy = compute_accuracy(
-            np.array(results["labels"]), np.array(results["preds"])
-        )
-        average_loss = total_loss / len(self.val_loader)
-
-        self.summary_writer.add_scalars(
-                "accuracy",
-                {"test": accuracy},
-                self.step
-        )
-        self.summary_writer.add_scalars(
-                "loss",
-                {"test": average_loss},
-                self.step
-        )
-        print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}")
+            for i, (input, rarget, filename) in enumerate(val_loader):
+                pass
 
 def compute_accuracy(
     labels: Union[torch.Tensor, np.ndarray], preds: Union[torch.Tensor, np.ndarray]
