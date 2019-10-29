@@ -9,7 +9,7 @@ import torch
 import torch.backends.cudnn
 import numpy as np
 from torch import nn, optim
-from torch.nn import functinal as F
+from torch.nn import functional as F
 import torchvision.datasets
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
@@ -23,7 +23,7 @@ torch.backends.cudnn.benchmark = True
 
 parser = argparse.ArgumentParser(
     description="Train a simple CNN on CIFAR-10",
-    formatter_class=argparse.ArgumentDefeaultsHelpFormatter,
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter,
 )
 default_dataset_dir = Path.home() / ".cache" / "torch" / "datasets"
 parser.add_argument("--dataset-root", default=default_dataset_dir)
@@ -69,7 +69,7 @@ parser.add_argument(
 parser.add_argument(
     "--mode",
     default="LMC",
-    type=string,
+    type=str,
     help="LMC, MC, or MLMC"
 )
 
@@ -79,7 +79,7 @@ class ImageShape(NamedTuple):
     channels: int
 
 if torch.cuda.is_available():
-    DEVICE = torch.device("cude")
+    DEVICE = torch.device("cuda")
 else:
     DEVICE = torch.device("cpu")
 
@@ -96,7 +96,7 @@ def main(args):
         batch_size=32, shuffle=False,
         num_workers=8, pin_memory=True)
 
-    model = CNN(height=32, width=32, channels=3, class_count=10)
+    model = CNN(height=81, width=45, channels=1, class_count=10)
 
     criterion = nn.CrossEntropyLoss()
 
@@ -121,7 +121,7 @@ def main(args):
 
     summary_writer.close()
 
-class CNN(nn.module):
+class CNN(nn.Module):
     def __init__(self, height: int, width: int, channels: int, class_count: int):
         super().__init__()
         self.input_shape = ImageShape(height=height, width=width, channels=channels)
@@ -133,7 +133,7 @@ class CNN(nn.module):
             in_channels=self.input_shape.channels,
             out_channels=32,
             kernel_size=(3, 3),
-            stride=(2, 2)
+            padding=(1, 1)
         )
         self.initialise_layer(self.conv1)
         self.bn1 = nn.BatchNorm2d(num_features=32)
@@ -144,7 +144,7 @@ class CNN(nn.module):
             in_channels=32,
             out_channels=64,
             kernel_size=(3, 3),
-            stride=(2, 2)
+            padding=(2, 2)
         )
         self.initialise_layer(self.conv2)
         self.bn2 = nn.BatchNorm2d(num_features=64)
@@ -156,7 +156,7 @@ class CNN(nn.module):
             in_channels=64,
             out_channels=64,
             kernel_size=(3, 3),
-            stride=(2, 2)
+            padding=(2, 2)
         )
         self.initialise_layer(self.conv3)
         self.bn3 = nn.BatchNorm2d(num_features=64)
@@ -189,9 +189,9 @@ class CNN(nn.module):
         x = self.pool2(x)
         x = F.relu(self.bn3(self.conv3(x)))
         x = F.relu(self.bn4(self.conv4(x)))
-        #x = torch.flatten(x, start_dim=1)
-        #x = F.relu(self.fc1(x))
-        #x = self.out(x)
+        x = torch.flatten(x, start_dim=1)
+        x = F.relu(self.fc1(x))
+        x = self.out(x)
         return x
 
     @staticmethod
@@ -231,8 +231,38 @@ class Trainer:
         start_epoch: int = 0
     ):
         self.model.train()
-        for i, (inputs, target, filename) in enumerate(train_loader):
-            pass
+        for epoch in range(start_epoch, epochs):
+            self.model.train()
+            data_load_start_time = time.time()
+            for i, (inputs, target, filename) in enumerate(self.train_loader):
+                batch = inputs.to(self.device)
+                labels = target.to(self.device)
+                data_load_end_time = time.time()
+
+                logits = self.model.forward(batch)
+
+                loss = self.criterion(logits, labels)
+
+                loss.backward()
+
+                self.optimizer.step()
+                self.optimizer.zero_grad()
+
+                with torch.no_grad():
+                    preds = logits.argmax(-1)
+                    accuracy = compute_accuracy(labels, preds)
+
+                data_load_time = data_load_end_time - data_load_start_time
+                step_time = time.time() - data_load_end_time
+                if ((self.step + 1) % log_frequency) == 0:
+                    self.log_metrics(epoch, accuracy, loss, data_load_time, step_time)
+                if ((self.step + 1) % print_frequency) == 0:
+                    self.print_metrics(epoch, accuracy, loss, data_load_time, step_time)
+
+                self.step += 1
+                data_load_start_time = time.time()
+
+            self.summary_writer.add_scalar("epoch", epoch, self.step)
 
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         epoch_step = self.step % len(self.train_loader)
@@ -271,7 +301,7 @@ class Trainer:
         self.model.eval()
 
         with torch.no_grad():
-            for i, (input, rarget, filename) in enumerate(val_loader):
+            for i, (input, target, filename) in enumerate(val_loader):
                 pass
 
 def compute_accuracy(
