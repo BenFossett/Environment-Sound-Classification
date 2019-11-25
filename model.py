@@ -15,8 +15,7 @@ class CNN(nn.Module):
         self.class_count = class_count
         self.dropout = nn.Dropout(p=dropout)
 
-        # Layer 1 - 32 kernels with (3x3) receptive field, stride step (2x2)
-        # and batch normalisation
+        # Layer 1 - 32 kernels with (3x3) receptive field, batch normalisation
         self.conv1 = nn.Conv2d(
             in_channels=self.input_shape.channels,
             out_channels=32,
@@ -26,8 +25,8 @@ class CNN(nn.Module):
         self.initialise_layer(self.conv1)
         self.bn1 = nn.BatchNorm2d(num_features=32)
 
-        # Layer 2 - 32 kernels with (3x3) receptive field, stride step (2x2)
-        # and batch normalisation followed by (2x2) max-pooling
+        # Layer 2 - 32 kernels with (3x3) receptive field, batch normalisation
+        # followed by (2x2) max-pooling
         self.conv2 = nn.Conv2d(
             in_channels=32,
             out_channels=64,
@@ -38,27 +37,27 @@ class CNN(nn.Module):
         self.bn2 = nn.BatchNorm2d(num_features=64)
         self.pool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
 
-        # Layer 3 - 64 kernels with (3x3) receptive field, stride step (2x2)
-        # and batch normalisation
+        # Layer 3 - 64 kernels with (3x3) receptive field, batch normalisation
         self.conv3 = nn.Conv2d(
+            in_channels=64,
+            out_channels=64,
+            kernel_size=(3, 3),
+            padding=(1, 1)
+        )
+        self.initialise_layer(self.conv3)
+        self.bn3 = nn.BatchNorm2d(num_features=64)
+
+        # Layer 4 - 64 kernels with (3x3) receptive field, batch normalisation
+        # followed by (2x2) max-pooling
+        self.conv4 = nn.Conv2d(
             in_channels=64,
             out_channels=64,
             kernel_size=(3, 3),
             padding=(2, 2)
         )
-        self.initialise_layer(self.conv3)
-        self.bn3 = nn.BatchNorm2d(num_features=64)
-
-        # Layer 4 - 64 kernels with (3x3) receptive field, stride step (2x2)
-        # and batch normalisation
-        self.conv4 = nn.Conv2d(
-            in_channels=64,
-            out_channels=64,
-            kernel_size=(3, 3),
-            stride=(2, 2)
-        )
         self.initialise_layer(self.conv4)
         self.bn4 = nn.BatchNorm2d(num_features=64)
+        self.pool4 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
 
         # Layer 5 - Fully connected layer with 1024 hidden units
         self.fc1 = nn.Linear(15488, 1024)
@@ -72,6 +71,7 @@ class CNN(nn.Module):
         x = self.pool2(x)
         x = F.relu(self.bn3(self.conv3(x)))
         x = F.relu(self.bn4(self.conv4(self.dropout(x))))
+        x = self.pool4(x)
         x = torch.flatten(x, start_dim=1)
         x = F.relu(self.fc1(self.dropout(x)))
         x = self.out(x)
