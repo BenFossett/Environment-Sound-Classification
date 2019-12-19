@@ -153,7 +153,7 @@ class Trainer:
         accuracy = compute_accuracy(
             np.array(results["labels"]), np.array(results["preds"])
         )
-        average_loss = total_loss / len(self.val_loader)
+        average_loss = total_loss / len(file_labels)
 
         classes = ["air conditioner", "car horn", "children playing",
         "dog bark", "drilling", "engine idling", "gun shot", "jack hammer",
