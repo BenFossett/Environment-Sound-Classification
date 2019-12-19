@@ -9,7 +9,7 @@ class ImageShape(NamedTuple):
     channels: int
 
 class CNN(nn.Module):
-    def __init__(self, height: int, width: int, channels: int, class_count: int, dropout: int):
+    def __init__(self, height: int, width: int, channels: int, class_count: int, dropout: int, mode: str):
         super().__init__()
         self.input_shape = ImageShape(height=height, width=width, channels=channels)
         self.class_count = class_count
@@ -31,11 +31,11 @@ class CNN(nn.Module):
             in_channels=32,
             out_channels=64,
             kernel_size=(3, 3),
-            padding=(2, 2)
+            padding=(1, 1)
         )
         self.initialise_layer(self.conv2)
         self.bn2 = nn.BatchNorm2d(num_features=64)
-        self.pool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+        self.pool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=(1, 1))
 
         # Layer 3 - 64 kernels with (3x3) receptive field, batch normalisation
         self.conv3 = nn.Conv2d(
@@ -53,14 +53,17 @@ class CNN(nn.Module):
             in_channels=64,
             out_channels=64,
             kernel_size=(3, 3),
-            padding=(2, 2)
+            padding=(1, 1)
         )
         self.initialise_layer(self.conv4)
         self.bn4 = nn.BatchNorm2d(num_features=64)
-        self.pool4 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
+        self.pool4 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=(1, 1))
 
         # Layer 5 - Fully connected layer with 1024 hidden units
-        self.fc1 = nn.Linear(15488, 1024)
+        if mode == "MLMC":
+            self.fc1 = nn.Linear(26048, 1024)
+        else:
+            self.fc1 = nn.Linear(15488, 1024)
 
         # Output layer - ten units
         self.out = nn.Linear(1024, 10)

@@ -71,6 +71,9 @@ class Trainer:
                 data_load_start_time = time.time()
 
             self.summary_writer.add_scalar("epoch", epoch, self.step)
+            if ((epoch + 1) % val_frequency) == 0:
+                self.validate()
+                self.model.train()
 
     def print_metrics(self, epoch, accuracy, loss, data_load_time, step_time):
         epoch_step = self.step % len(self.train_loader)
@@ -105,13 +108,74 @@ class Trainer:
 
     def validate(self):
         results = {"preds": [], "labels": []}
+        dict = {}
         total_loss = 0
         self.model.eval()
 
         with torch.no_grad():
-            for i, (input, target, filename) in enumerate(val_loader):
+            for i, (input, target, filename) in enumerate(self.val_loader):
                 batch = input.to(self.device)
                 labels = target.to(self.device)
+                logits = self.model.forward(batch)
+
+                logits_array = logits.cpu().numpy()
+                labels_array = labels.cpu().numpy()
+                batch_size = len(filename)
+                for j in range(0, batch_size):
+                    file = filename[j]
+                    if file in dict:
+                        dict[file]["sum"] += logits_array[j]
+                        dict[file]["n_segments"] += 1
+                    else:
+                        dict[file] = {}
+                        dict[file]["label"] = labels_array[j]
+                        dict[file]["sum"] = logits_array[j]
+                        dict[file]["n_segments"] = 1
+                        dict[file]["average"] = 0
+
+                for f in dict:
+                    sum = dict[f]["sum"]
+                    n_segments = dict[f]["n_segments"]
+                    dict[f]["average"] = sum / n_segments
+
+
+            file_labels = np.hstack([dict[k]["label"] for k, l in dict.items()])
+            file_logits = np.vstack([dict[k]["average"] for k, a in dict.items()])
+            labels = torch.from_numpy(file_labels).to(self.device)
+            logits = torch.from_numpy(file_logits).to(self.device)
+            loss = self.criterion(logits, labels)
+            total_loss += loss.item()
+            preds = np.argmax(file_logits, axis=-1)
+            #preds = logits.argmax(dim=-1).cpu().numpy()
+            results["preds"].extend(list(preds))
+            results["labels"].extend(list(labels.cpu().numpy()))
+
+        accuracy = compute_accuracy(
+            np.array(results["labels"]), np.array(results["preds"])
+        )
+        average_loss = total_loss / len(self.val_loader)
+
+        classes = ["air conditioner", "car horn", "children playing",
+        "dog bark", "drilling", "engine idling", "gun shot", "jack hammer",
+        "siren", "street music"]
+        class_accuracies = compute_per_class_accuracy(np.array(results["labels"]), np.array(results["preds"]))
+
+        self.summary_writer.add_scalars(
+                "accuracy",
+                {"test": accuracy},
+                self.step
+        )
+        self.summary_writer.add_scalars(
+                "loss",
+                {"test": average_loss},
+                self.step
+        )
+        print(f"validation loss: {average_loss:.5f}, accuracy: {accuracy * 100:2.2f}")
+
+        for i in range(0, 10):
+            print(f"class: {classes[i]}, class accuracy: {class_accuracies[i] * 100:2.2f}")
+
+        print(f"average class accuracy: {np.average(class_accuracies) * 100:2.2f}")
 
 def compute_accuracy(
     labels: Union[torch.Tensor, np.ndarray], preds: Union[torch.Tensor, np.ndarray]
@@ -123,3 +187,20 @@ def compute_accuracy(
     """
     assert len(labels) == len(preds)
     return float((labels == preds).sum()) / len(labels)
+
+def compute_per_class_accuracy(
+    labels: Union[torch.Tensor, np.ndarray], preds: Union[torch.Tensor, np.ndarray]
+) -> float:
+    """
+    Args:
+        labels: ``(batch_size, class_count)`` tensor or array containing example labels
+        preds: ``(batch_size, class_count)`` tensor or array containing model prediction
+    """
+    assert len(labels) == len(preds)
+
+    accuracies = []
+    for i in range(0, 10):
+        class_labels = labels == i
+        correct_preds = (preds == labels)
+        accuracies.append(float((class_labels & correct_preds).sum() / (class_labels).sum()))
+    return accuracies

@@ -98,7 +98,10 @@ def main(args):
         batch_size=32, shuffle=False,
         num_workers=8, pin_memory=True)
 
-    model = CNN(height=81, width=45, channels=1, class_count=10, dropout=args.dropout)
+    if args.mode == "LMC" or args.mode == "MC":
+        model = CNN(height=81, width=45, channels=1, class_count=10, dropout=args.dropout, mode=args.mode)
+    elif args.mode == "MLMC":
+        model = CNN(height=141, width=45, channels=1, class_count=10, dropout=args.dropout, mode=args.mode)
 
     criterion = nn.CrossEntropyLoss()
 
@@ -135,7 +138,7 @@ def get_summary_writer_log_dir(args: argparse.Namespace) -> str:
         from getting logged to the same TB log directory (which you can't easily
         untangle in TB).
     """
-    tb_log_dir_prefix = f'CNN_bn_dropout={args.dropout}_bs={args.batch_size}_lr={args.learning_rate}_momentum=0.9_run_'
+    tb_log_dir_prefix = f'CNN_bn_mode={args.mode}_dropout={args.dropout}_bs={args.batch_size}_lr={args.learning_rate}_momentum=0.9_run_'
     i = 0
     while i < 1000:
         tb_log_dir = args.log_dir / (tb_log_dir_prefix + str(i))
