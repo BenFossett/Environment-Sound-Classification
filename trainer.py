@@ -10,6 +10,8 @@ from torch.optim.optimizer import Optimizer
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 
+from pathlib import Path
+
 class Trainer:
     def __init__(
         self,
@@ -20,6 +22,8 @@ class Trainer:
         optimizer: Optimizer,
         summary_writer: SummaryWriter,
         device: torch.device,
+        checkpoint_path: Path,
+        checkpoint_frequency: int
     ):
         self.model = model.to(device)
         self.device = device
@@ -29,6 +33,8 @@ class Trainer:
         self.optimizer = optimizer
         self.summary_writer = summary_writer
         self.step = 0
+        self.checkpoint_path = checkpoint_path
+        self.checkpoint_frequency = checkpoint_frequency
 
     def train(
         self,
@@ -69,6 +75,10 @@ class Trainer:
 
                 self.step += 1
                 data_load_start_time = time.time()
+
+            if (epoch + 1) % self.checkpoint_frequency == 0 or (epoch + 1) == epochs:
+                print(f"Saving model to {self.checkpoint_path}")
+                torch.save(self.model.state_dict(), self.checkpoint_path)
 
             self.summary_writer.add_scalar("epoch", epoch, self.step)
             if ((epoch + 1) % val_frequency) == 0:
@@ -117,6 +127,8 @@ class Trainer:
                 batch = input.to(self.device)
                 labels = target.to(self.device)
                 logits = self.model.forward(batch)
+                loss = self.criterion(logits, labels)
+                total_loss += loss.item()
 
                 logits_array = logits.cpu().numpy()
                 labels_array = labels.cpu().numpy()
@@ -143,8 +155,6 @@ class Trainer:
             file_logits = np.vstack([dict[k]["average"] for k, a in dict.items()])
             labels = torch.from_numpy(file_labels).to(self.device)
             logits = torch.from_numpy(file_logits).to(self.device)
-            loss = self.criterion(logits, labels)
-            total_loss += loss.item()
             preds = np.argmax(file_logits, axis=-1)
             #preds = logits.argmax(dim=-1).cpu().numpy()
             results["preds"].extend(list(preds))
@@ -153,7 +163,7 @@ class Trainer:
         accuracy = compute_accuracy(
             np.array(results["labels"]), np.array(results["preds"])
         )
-        average_loss = total_loss / len(file_labels)
+        average_loss = total_loss / len(self.val_loader)
 
         classes = ["air conditioner", "car horn", "children playing",
         "dog bark", "drilling", "engine idling", "gun shot", "jack hammer",

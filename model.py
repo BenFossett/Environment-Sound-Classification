@@ -59,7 +59,8 @@ class CNN(nn.Module):
         self.bn4 = nn.BatchNorm2d(num_features=64)
         self.pool4 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2), padding=(1, 1))
 
-        # Layer 5 - Fully connected layer with 1024 hidden units
+        # Layer 5 - Fully connected layer with 1024 hidden units, number of
+        # inputs depends on whether mode is LMC/MC or MLMC.
         if mode == "MLMC":
             self.fc1 = nn.Linear(26048, 1024)
         else:

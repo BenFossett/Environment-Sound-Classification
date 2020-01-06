@@ -69,6 +69,18 @@ parser.add_argument(
     help="Number of worker processes used to load data.",
 )
 parser.add_argument(
+    "--checkpoint-path",
+    default=Path("checkpointLMC.pkl"),
+    type=Path,
+    help="Provide a file to store checkpoints of the model parameters during training."
+)
+parser.add_argument(
+    "--checkpoint-frequency",
+    type=int,
+    default=10,
+    help="Save a checkpoint every N epochs"
+)
+parser.add_argument(
     "--mode",
     default="LMC",
     type=str,
@@ -99,13 +111,13 @@ def main(args):
         num_workers=8, pin_memory=True)
 
     if args.mode == "LMC" or args.mode == "MC":
-        model = CNN(height=81, width=45, channels=1, class_count=10, dropout=args.dropout, mode=args.mode)
+        model = CNN(height=85, width=41, channels=1, class_count=10, dropout=args.dropout, mode=args.mode)
     elif args.mode == "MLMC":
-        model = CNN(height=141, width=45, channels=1, class_count=10, dropout=args.dropout, mode=args.mode)
+        model = CNN(height=141, width=41, channels=1, class_count=10, dropout=args.dropout, mode=args.mode)
 
     criterion = nn.CrossEntropyLoss()
 
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=5e-3)
 
     log_dir = get_summary_writer_log_dir(args)
     print(f"Writing logs to {log_dir}")
@@ -114,7 +126,8 @@ def main(args):
             flush_secs=5
     )
     trainer = Trainer(
-        model, train_loader, test_loader, criterion, optimizer, summary_writer, DEVICE
+        model, train_loader, test_loader, criterion, optimizer, summary_writer,
+        DEVICE, args.checkpoint_path, args.checkpoint_frequency
     )
 
     trainer.train(
