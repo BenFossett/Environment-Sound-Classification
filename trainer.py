@@ -118,7 +118,7 @@ class Trainer:
 
     def validate(self):
         results = {"preds": [], "labels": []}
-        dict = {}
+        file_results = {}
         total_loss = 0
         self.model.eval()
 
@@ -130,35 +130,24 @@ class Trainer:
                 loss = self.criterion(logits, labels)
                 total_loss += loss.item()
 
-                logits_array = logits.cpu().numpy()
+                preds = logits.cpu().numpy()
                 labels_array = labels.cpu().numpy()
                 batch_size = len(filename)
+
                 for j in range(0, batch_size):
                     file = filename[j]
-                    if file in dict:
-                        dict[file]["sum"] += logits_array[j]
-                        dict[file]["n_segments"] += 1
-                    else:
-                        dict[file] = {}
-                        dict[file]["label"] = labels_array[j]
-                        dict[file]["sum"] = logits_array[j]
-                        dict[file]["n_segments"] = 1
-                        dict[file]["average"] = 0
+                    label = labels_array[j]
+                    pred = preds[j]
+                    if file not in file_results:
+                        file_results[file] = {"preds": [], "labels": []}
+                    file_results[file]["preds"].append(pred)
+                    file_results[file]["labels"].append(label)
 
-                for f in dict:
-                    sum = dict[f]["sum"]
-                    n_segments = dict[f]["n_segments"]
-                    dict[f]["average"] = sum / n_segments
-
-
-            file_labels = np.hstack([dict[k]["label"] for k, l in dict.items()])
-            file_logits = np.vstack([dict[k]["average"] for k, a in dict.items()])
-            labels = torch.from_numpy(file_labels).to(self.device)
-            logits = torch.from_numpy(file_logits).to(self.device)
-            preds = np.argmax(file_logits, axis=-1)
-            #preds = logits.argmax(dim=-1).cpu().numpy()
-            results["preds"].extend(list(preds))
-            results["labels"].extend(list(labels.cpu().numpy()))
+        for f in file_results:
+            file_pred = np.argmax(np.mean(file_results[f]["preds"]), axis=0)
+            file_label = np.round(np.mean(file_results[f]["labels"])).astype(int)
+            results["preds"].append(file_pred)
+            results["labels"].append(file_label)
 
         accuracy = compute_accuracy(
             np.array(results["labels"]), np.array(results["preds"])

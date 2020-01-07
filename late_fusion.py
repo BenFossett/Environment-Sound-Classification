@@ -52,6 +52,7 @@ def main(args):
     model_LMC = CNN(height=85, width=41, channels=1, class_count=10, dropout=0.5, mode='LMC')
     checkpoint_LMC = torch.load(args.checkpoint_LMC, map_location = DEVICE)
     model_LMC.load_state_dict(checkpoint_LMC)
+    print("LMC Loaded")
 
     loader_MC = torch.utils.data.DataLoader(
     UrbanSound8KDataset('UrbanSound8K_test.pkl', mode='MC'),
@@ -60,11 +61,13 @@ def main(args):
     model_MC = CNN(height=85, width=41, channels=1, class_count=10, dropout=0.5, mode='MC')
     checkpoint_MC = torch.load(args.checkpoint_MC, map_location = DEVICE)
     model_MC.load_state_dict(checkpoint_MC)
+    print("MC Loaded")
 
     criterion = nn.CrossEntropyLoss()
     validate_TSCNN(model_LMC, model_MC, loader_LMC, loader_MC, criterion, DEVICE)
 
 def validate_TSCNN(model_LMC, model_MC, loader_LMC, loader_MC, criterion, device):
+    print("Performing late fusion")
     results = {"preds": [], "labels": []}
     dict = {}
     total_loss = 0
@@ -74,20 +77,24 @@ def validate_TSCNN(model_LMC, model_MC, loader_LMC, loader_MC, criterion, device
 
     with torch.no_grad():
         for i, (input_LMC, target, filename) in enumerate(loader_LMC):
+            print(i)
             (input_MC, _, _) = next(loader_MC)
+            print("MC")
             batch_LMC = input_LMC.to(device)
             batch_MC = input_MC.to(device)
             labels = target.to(device)
             logits_LMC = nn.Softmax(model_LMC.forward(batch_LMC))
             logits_MC = nn.Softmax(model_MC.forward(batch_MC))
+            print("logits")
             logits = (logits_array_LMC + logits_array_MC) / 2
             loss = self.criterion(logits, labels)
             total_loss += loss.item()
+            print("loss")
 
             logits_array = logits.cpu().numpy()
             labels_array = labels.cpu().numpy()
             batch_size = len(filename)
-
+            print("loop")
             for j in range(0, batch_size):
                 file = filename[j]
                 if file in dict:
@@ -100,10 +107,10 @@ def validate_TSCNN(model_LMC, model_MC, loader_LMC, loader_MC, criterion, device
                     dict[file]["n_segments"] = 1
                     dict[file]["average"] = 0
 
-            for f in dict:
-                sum = dict[f]["sum"]
-                n_segments = dict[f]["n_segments"]
-                dict[f]["average"] = sum / n_segments
+        for f in dict:
+            sum = dict[f]["sum"]
+            n_segments = dict[f]["n_segments"]
+            dict[f]["average"] = sum / n_segments
 
         file_labels = np.hstack([dict[k]["label"] for k, l in dict.items()])
         file_logits = np.vstack([dict[k]["average"] for k, a in dict.items()])

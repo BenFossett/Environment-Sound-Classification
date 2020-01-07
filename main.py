@@ -91,6 +91,11 @@ parser.add_argument(
     default=0.5,
     type=float,
 )
+parser.add_argument(
+    "--weight-decay",
+    default=5e-3,
+    type=float,
+)
 
 if torch.cuda.is_available():
     DEVICE = torch.device("cuda")
@@ -117,7 +122,7 @@ def main(args):
 
     criterion = nn.CrossEntropyLoss()
 
-    optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=5e-3)
+    optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=args.weight_decay)
 
     log_dir = get_summary_writer_log_dir(args)
     print(f"Writing logs to {log_dir}")
