@@ -69,15 +69,15 @@ class CNN(nn.Module):
         # Output layer - ten units
         self.out = nn.Linear(1024, 10)
 
-    def forward(self, specs: torch.Tensor) -> torch.Tensor:
-        x = F.relu(self.bn1(self.conv1(specs)))
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        x = F.relu(self.bn1(self.conv1(images)))
         x = F.relu(self.bn2(self.conv2(self.dropout(x))))
         x = self.pool2(x)
         x = F.relu(self.bn3(self.conv3(x)))
         x = F.relu(self.bn4(self.conv4(self.dropout(x))))
         x = self.pool4(x)
         x = torch.flatten(x, start_dim=1)
-        x = F.relu(self.fc1(self.dropout(x)))
+        x = F.sigmoid(self.fc1(self.dropout(x)))
         x = self.out(x)
         return x
 

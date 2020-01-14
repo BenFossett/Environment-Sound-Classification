@@ -1,5 +1,6 @@
 import time
-from typing import Union
+
+from utils import compute_accuracy, compute_per_class_accuracy
 
 import torch
 import torch.backends.cudnn
@@ -78,7 +79,9 @@ class Trainer:
 
             if (epoch + 1) % self.checkpoint_frequency == 0 or (epoch + 1) == epochs:
                 print(f"Saving model to {self.checkpoint_path}")
-                torch.save(self.model.state_dict(), self.checkpoint_path)
+                torch.save({"epoch": epoch,
+                            "model": self.model.state_dict()},
+                            self.checkpoint_path)
 
             self.summary_writer.add_scalar("epoch", epoch, self.step)
             if ((epoch + 1) % val_frequency) == 0:
@@ -144,7 +147,7 @@ class Trainer:
                     file_results[file]["labels"].append(label)
 
         for f in file_results:
-            file_pred = np.argmax(np.mean(file_results[f]["preds"]), axis=0)
+            file_pred = np.argmax(np.mean(file_results[f]["preds"], axis=0))
             file_label = np.round(np.mean(file_results[f]["labels"])).astype(int)
             results["preds"].append(file_pred)
             results["labels"].append(file_label)
@@ -175,31 +178,3 @@ class Trainer:
             print(f"class: {classes[i]}, class accuracy: {class_accuracies[i] * 100:2.2f}")
 
         print(f"average class accuracy: {np.average(class_accuracies) * 100:2.2f}")
-
-def compute_accuracy(
-    labels: Union[torch.Tensor, np.ndarray], preds: Union[torch.Tensor, np.ndarray]
-) -> float:
-    """
-    Args:
-        labels: ``(batch_size, class_count)`` tensor or array containing example labels
-        preds: ``(batch_size, class_count)`` tensor or array containing model prediction
-    """
-    assert len(labels) == len(preds)
-    return float((labels == preds).sum()) / len(labels)
-
-def compute_per_class_accuracy(
-    labels: Union[torch.Tensor, np.ndarray], preds: Union[torch.Tensor, np.ndarray]
-) -> float:
-    """
-    Args:
-        labels: ``(batch_size, class_count)`` tensor or array containing example labels
-        preds: ``(batch_size, class_count)`` tensor or array containing model prediction
-    """
-    assert len(labels) == len(preds)
-
-    accuracies = []
-    for i in range(0, 10):
-        class_labels = labels == i
-        correct_preds = (preds == labels)
-        accuracies.append(float((class_labels & correct_preds).sum() / (class_labels).sum()))
-    return accuracies
