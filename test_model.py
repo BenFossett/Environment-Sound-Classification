@@ -97,6 +97,9 @@ class Validator:
                 labels_array = labels.cpu().numpy()
                 batch_size = len(filename)
 
+                # Collect together the predictions for segments corresponding
+                # to their respective files in order to calculate validation
+                # accuracy.
                 for j in range(0, batch_size):
                     file = filename[j]
                     label = labels_array[j]
@@ -106,10 +109,12 @@ class Validator:
                     file_results[file]["preds"].append(pred)
                     file_results[file]["labels"].append(label)
 
+        # Save logits to be used for late fusion.
         f = open(mode + "scores.pkl", "wb")
         pickle.dump(file_results, f)
         f.close()
 
+        # Compute final per-file predictions.
         for f in file_results:
             file_pred = np.argmax(np.mean(file_results[f]["preds"], axis=0))
             file_label = np.round(np.mean(file_results[f]["labels"])).astype(int)
@@ -142,14 +147,17 @@ def TSCNN(LMCscores, MCscores, device):
         LMC_file = LMCscores[file]
         MC_file = MCscores[file]
 
+        # Obtain LMC logits and label for each file.
         LMC_pred = torch.from_numpy(np.mean(LMC_file["preds"], axis=0)).to(device)
         LMC_logits = softmax(LMC_pred)
         LMC_label = np.round(np.mean(LMC_file["labels"])).astype(int)
 
+        # Obtain MC logits and label for each file.
         MC_pred = torch.from_numpy(np.mean(MC_file["preds"], axis=0)).to(device)
         MC_logits = softmax(MC_pred)
         MC_label = np.round(np.mean(MC_file["labels"])).astype(int)
 
+        # Average logits and calculate final prediction.
         logits = (LMC_logits + MC_logits) / 2
         pred = logits.argmax().cpu().numpy()
         results["preds"].append(pred)

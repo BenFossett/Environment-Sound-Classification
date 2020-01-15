@@ -55,9 +55,7 @@ class Trainer:
                 data_load_end_time = time.time()
 
                 logits = self.model.forward(batch)
-
                 loss = self.criterion(logits, labels)
-
                 loss.backward()
 
                 self.optimizer.step()
@@ -137,6 +135,9 @@ class Trainer:
                 labels_array = labels.cpu().numpy()
                 batch_size = len(filename)
 
+                # Collect together the predictions for segments corresponding
+                # to their respective files in order to calculate validation
+                # accuracy.
                 for j in range(0, batch_size):
                     file = filename[j]
                     label = labels_array[j]
@@ -146,6 +147,7 @@ class Trainer:
                     file_results[file]["preds"].append(pred)
                     file_results[file]["labels"].append(label)
 
+        # Compute final per-file predictions.
         for f in file_results:
             file_pred = np.argmax(np.mean(file_results[f]["preds"], axis=0))
             file_label = np.round(np.mean(file_results[f]["labels"])).astype(int)

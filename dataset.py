@@ -15,20 +15,14 @@ class UrbanSound8KDataset(data.Dataset):
         spec = features["spectral_contrast"]
         tonnetz = features["tonnetz"]
         if self.mode == 'LMC':
-            # Edit here to load and concatenate the neccessary features to
-            # create the LMC feature
             lm = features["logmelspec"]
             feature = np.concatenate((lm, chroma, spec, tonnetz))
             feature = torch.from_numpy(feature.astype(np.float32)).unsqueeze(0)
         elif self.mode == 'MC':
-            # Edit here to load and concatenate the neccessary features to
-            # create the MC feature
             m = features["mfcc"]
             feature = np.concatenate((m, chroma, spec, tonnetz))
             feature = torch.from_numpy(feature.astype(np.float32)).unsqueeze(0)
         elif self.mode == 'MLMC':
-            # Edit here to load and concatenate the neccessary features to
-            # create the MLMC feature
             lm = features["logmelspec"]
             m = features["mfcc"]
             feature = np.concatenate((lm, m, chroma, spec, tonnetz))

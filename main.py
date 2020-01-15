@@ -39,7 +39,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--epochs",
-    default=20,
+    default=50,
     type=int,
     help="Number of epochs (passes through the entire dataset) to train for"
 )
@@ -115,6 +115,8 @@ def main(args):
         batch_size=32, shuffle=False,
         num_workers=8, pin_memory=True)
 
+    # Change the input dimensions if we are using MLMC.
+    # Direct user to correct file if they want to use TSCNN.
     if args.mode == "LMC" or args.mode == "MC":
         model = CNN(height=85, width=41, channels=1, class_count=10, dropout=args.dropout, mode=args.mode)
     elif args.mode == "MLMC":
@@ -124,7 +126,8 @@ def main(args):
 
     criterion = nn.CrossEntropyLoss()
 
-    #optimizer = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9, weight_decay=args.weight_decay)
+    # Paper specifies "variant of stochastic gradient descent" with reference
+    # pointing to Adam. Weight decay used for L2 regularisation.
     optimizer = optim.Adam(model.parameters(), lr=args.learning_rate, weight_decay=args.weight_decay)
 
     log_dir = get_summary_writer_log_dir(args)
